@@ -3,6 +3,7 @@ from .evaluator import Evaluator
 from .indexer import Indexer
 from .response_generator import ResponseGenerator
 from .retriever import Retriever
+from .generation_model import GeneratorModel
 
 __all__ = [
     "Datastore",
@@ -10,4 +11,5 @@ __all__ = [
     "Indexer",
     "ResponseGenerator",
     "Retriever",
+    "GeneratorModel"
 ]

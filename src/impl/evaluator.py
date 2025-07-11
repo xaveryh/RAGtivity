@@ -1,6 +1,6 @@
 from src.interface.base_evaluator import BaseEvaluator, EvaluationResult
-from src.util.invoke_ai import invoke_ai
 from src.util.extract_xml import extract_xml_tag
+from .generation_model import GeneratorModel
 
 SYSTEM_PROMPT = """
 You are a system that evaluates the correctness of a response to a question.
@@ -11,8 +11,8 @@ The expected answer will be provided in <expected_answer>...</expected_answer> t
 The response doesn't have to exactly match all the words/context the expected answer. It just needs to be right about
 the answer to the actual question itself.
 
-Evaluate whether the response is correct or not, and return your reasoning in <reasoning>...</reasoning> tags.
-Then return the result in <result>...</result> tags — either as 'true' or 'false'.
+Evaluate whether the response is correct given the context or not. If it is, output <result>true</result>. If not, output <result>false</result>
+Then, output your reasoning inside the <reasoning></reasoning> tags.
 """
 
 
@@ -26,21 +26,22 @@ class Evaluator(BaseEvaluator):
         <response>\n{response}\n</response>
         <expected_answer>\n{expected_answer}\n</expected_answer>
         """
-
-        response_content = invoke_ai(
-            system_message=SYSTEM_PROMPT, user_message=user_prompt
+        generator = GeneratorModel()
+        response_content = generator.invoke_ai(
+            system_message=SYSTEM_PROMPT, 
+            user_message=user_prompt
         )
-
+    
         reasoning = extract_xml_tag(response_content, "reasoning")
         result = extract_xml_tag(response_content, "result")
-        print(response_content)
 
         if result is not None:
             is_correct = result.lower() == "true"
         else:
             is_correct = False
             reasoning = f"No result found: ({response_content})"
-
+        print("RESPONSE CONTENT: ", response_content)
+        print("END RESPONSE")
         return EvaluationResult(
             question=query,
             response=response,

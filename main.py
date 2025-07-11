@@ -14,20 +14,10 @@ DEFAULT_SOURCE_PATH = "sample_data/source/"
 DEFAULT_EVAL_PATH = "sample_data/eval/sample_questions.json"
 
 
-def create_pipeline() -> RAGPipeline:
-    """Create and return a new RAG Pipeline instance with all components."""
-    datastore = Datastore()
-    indexer = Indexer()
-    retriever = Retriever(datastore=datastore)
-    response_generator = ResponseGenerator()
-    evaluator = Evaluator()
-    return RAGPipeline(datastore, indexer, retriever, response_generator, evaluator)
-
-
 def main():
     parser = create_parser()  # Create the CLI parser
     args = parser.parse_args()
-    pipeline = create_pipeline()
+    pipeline = RAGPipeline()
 
     # Process source paths and eval path
     source_path = args.path if args.path else DEFAULT_SOURCE_PATH

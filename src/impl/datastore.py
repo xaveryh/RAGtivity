@@ -31,10 +31,10 @@ class Datastore(BaseDatastore):
             self.embeddings.append(embedding)
             self.contents.append(item.content)
             self.sources.append(item.source)
-        
+            
         print(f"✅ Added {len(items)} items to datastore. Total items: {len(self.contents)}")
 
-    def search(self, query: str, top_k: int = 5) -> List[str]:
+    def search(self, query: str, top_k: int = 3) -> List[str]:
         """Search for similar content using cosine similarity."""
         if not self.embeddings:
             return []

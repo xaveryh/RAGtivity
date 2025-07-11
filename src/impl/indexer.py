@@ -10,9 +10,9 @@ nltk.download('punkt_tab')
 from nltk.tokenize import sent_tokenize
 
 class Indexer(BaseIndexer):
-    def __init__(self):
+    def __init__(self, datastore):
         self.converter = DocumentConverter()
-        self.datastore = Datastore()  # Create a datastore instance
+        self.datastore = datastore 
         os.environ["TOKENIZERS_PARALLELISM"] = "false" # Disable tokenizers parallelism to avoid OOM errors.
 
     def index(self, document_paths: List[str]) -> List[DataItem]:

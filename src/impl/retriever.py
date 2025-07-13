@@ -2,6 +2,7 @@ from src.interface.base_datastore import BaseDatastore
 from src.interface.base_retriever import BaseRetriever
 
 
+# NOT USED RIGHT NOW
 class Retriever(BaseRetriever):
     def __init__(self, datastore: BaseDatastore):
         self.datastore = datastore

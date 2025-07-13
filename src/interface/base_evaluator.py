@@ -6,7 +6,7 @@ from pydantic import BaseModel
 class EvaluationResult(BaseModel):
     question: str
     response: str
-    expected_answer: str
+    # expected_answer: str
     is_correct: bool
     reasoning: Optional[str] = None
 

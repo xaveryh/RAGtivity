@@ -42,14 +42,14 @@ class RAGPipeline:
 
         results = []
         for i in range(len(questions)):
-            res = self._evaluate_single_question(questions[0], expected_answers[0])
+            res = self._evaluate_single_question(questions[i], expected_answers[i])
             results.append(res)
   
         for i, result in enumerate(results):
             result_emoji = "✅" if result.is_correct else "❌"
             print(f"{result_emoji} Q {i+1}: {result.question}: \n")
             print(f"Response: {result.response}\n")
-            print(f"Expected Answer: {result.expected_answer}\n")
+            # print(f"Expected Answer: {result.expected_answer}\n")
             print(f"Reasoning: {result.reasoning}\n")
             print("--------------------------------")
 
@@ -62,4 +62,4 @@ class RAGPipeline:
     ) -> EvaluationResult:
         # Evaluate a single question/answer pair.
         response = self.process_query(question)
-        return self.evaluator.evaluate(question, response, expected_answer)
+        return self.evaluator.evaluate(question, response, expected_answer, self.datastore)

@@ -1,7 +1,7 @@
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, pipeline
-from transformers import T5Tokenizer, T5ForConditionalGeneration
+from transformers import T5Tokenizer, T5ForConditionalGeneration, BitsAndBytesConfig
 import torch
 
+# Singleton class
 class GeneratorModel:
     _instance = None
 
@@ -32,7 +32,6 @@ class GeneratorModel:
                 torch_dtype=torch.float16,
                 token=""
             )
-        # self.pipeline = pipeline(model=self.model, torch_dtype=torch.float16, device_map="auto")
         self._initialized = True
 
     def invoke_ai(self, system_message: str, user_message: str) -> str:
@@ -41,7 +40,6 @@ class GeneratorModel:
         """
         # Combine everything into a single prompt
         full_prompt = f"{system_message}\n\n{user_message}"
-        print("FULL PROMPT: ", full_prompt, "END FULL PROMPT\n")
         # Send inputs to same device as model
         model_device = next(self.model.parameters()).device
         input_ids = self.tokenizer(full_prompt, return_tensors="pt").input_ids.to(model_device)
@@ -50,7 +48,5 @@ class GeneratorModel:
             outputs = self.model.generate(input_ids)
 
         answer = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        print("ANSWER ", answer, " END ANSWER\n")
-        # answer = self.pipeline(full_prompt)
 
         return answer

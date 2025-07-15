@@ -1,5 +1,4 @@
 from typing import List
-from src.interface.base_response_generator import BaseResponseGenerator
 from .generation_model import GeneratorModel
 
 SYSTEM_PROMPT = """
@@ -8,7 +7,7 @@ If you cannot find the answer in the context, say 'I dont know'. Do not make up 
 """
 
 
-class ResponseGenerator(BaseResponseGenerator):
+class ResponseGenerator:
     def generate_response(self, query: str, context: List[str]) -> str:
         """Generate a response using OpenAI's chat completion."""
         # Combine context into a single string

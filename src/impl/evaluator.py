@@ -1,4 +1,3 @@
-from src.interface.base_evaluator import BaseEvaluator, EvaluationResult
 from src.util.extract_xml import extract_xml_tag
 from .generation_model import GeneratorModel
 from transformers import T5Tokenizer, T5ForConditionalGeneration, BitsAndBytesConfig
@@ -38,9 +37,17 @@ You are an evaluation system that determines whether a generated answer from a l
 
 """
 
+HF_TOKEN = ""
+
+class EvaluationResult:
+    def __init__(self, question, response, is_correct, reasoning=""):
+        self.question = question
+        self.response = response
+        self.is_correct = is_correct
+        self.reasoning = reasoning
 
 # Singleton class
-class Evaluator(BaseEvaluator):
+class Evaluator:
     _instance = None
 
     def __new__(cls, model_id=None):
@@ -62,7 +69,7 @@ class Evaluator(BaseEvaluator):
                 # quantization_config=bnb_config,
                 trust_remote_code=True,
                 torch_dtype=torch.float16,
-                token=""
+                token=HF_TOKEN
             )
 
     def evaluate(

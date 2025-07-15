@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import Dict, List, Optional
-from src.impl import Datastore, Evaluator, Indexer, Retriever, ResponseGenerator
-from src.interface import EvaluationResult
+from src.impl import Datastore, Evaluator, Indexer, ResponseGenerator, EvaluationResult
 
 
 @dataclass
@@ -10,7 +9,6 @@ class RAGPipeline:
     def __init__(self):
         self.datastore = Datastore()
         self.indexer = Indexer(datastore=self.datastore)
-        # self.retriever = Retriever(datastore=self.datastore)
         self.response_generator = ResponseGenerator()
         self.evaluator = Evaluator()
 

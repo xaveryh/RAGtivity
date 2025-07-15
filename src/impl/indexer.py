@@ -1,15 +1,14 @@
 import os
 import numpy as np
 from typing import List
-from src.interface.base_datastore import DataItem
-from src.interface.base_indexer import BaseIndexer
 from docling.document_converter import DocumentConverter
 from src.impl import Datastore
+from .dataitem import DataItem
 import nltk
 nltk.download('punkt_tab')
 from nltk.tokenize import sent_tokenize
 
-class Indexer(BaseIndexer):
+class Indexer:
     def __init__(self, datastore):
         self.converter = DocumentConverter()
         self.datastore = datastore 

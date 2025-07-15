@@ -1,6 +1,8 @@
 from transformers import T5Tokenizer, T5ForConditionalGeneration, BitsAndBytesConfig
 import torch
 
+HF_TOKEN = ""
+
 # Singleton class
 class GeneratorModel:
     _instance = None
@@ -22,7 +24,7 @@ class GeneratorModel:
             bnb_4bit_quant_storage=torch.float16,
             bnb_4bit_use_double_quant=False
         )
-        
+            
         self.tokenizer = T5Tokenizer.from_pretrained(model_id)
         self.model = T5ForConditionalGeneration.from_pretrained(
                 model_id,
@@ -30,7 +32,7 @@ class GeneratorModel:
                 quantization_config=bnb_config,
                 trust_remote_code=True,
                 torch_dtype=torch.float16,
-                token=""
+                token=HF_TOKEN
             )
         self._initialized = True
 

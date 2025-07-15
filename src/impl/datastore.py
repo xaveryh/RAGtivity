@@ -1,10 +1,10 @@
 from typing import List
 import numpy as np
 from sentence_transformers import SentenceTransformer
-from src.interface.base_datastore import BaseDatastore, DataItem
+from .dataitem import DataItem
 
 
-class Datastore(BaseDatastore):
+class Datastore:
 
     def __init__(self):
         self.model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2', device='cpu')

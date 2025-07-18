@@ -1,38 +1,47 @@
 from typing import List
 import numpy as np
-from sentence_transformers import SentenceTransformer
-from .dataitem import DataItem
+import requests
+from fastapi import FastAPI
+from pydantic import BaseModel
+from shared.dataitem import DataItem
 
+
+class DatastoreRequest(BaseModel):
+    item: DataItem
 
 class Datastore:
 
     def __init__(self):
-        self.model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2', device='cpu')
         self.embeddings = []  # List of vectors
         self.contents = []    # List of content strings
-        self.sources = []     # List of source strings
+        self.filenames = []     # List of filename strings
 
     def reset(self):
         """Clear all stored data."""
         self.embeddings = []
         self.contents = []
-        self.sources = []
+        self.filenames = []
         print("✅ Datastore reset - all data cleared")
 
-    def get_embedding(self, content: str) -> List[float]:
-        """Generate embedding for a piece of content."""
-        embedding = self.model.encode(content, convert_to_numpy=True)
-        return embedding.tolist()
+    def add_item(self, item) -> None:
+        """
+        Add a DataItem to the datastore.
+        
+        Parameters:
+            item: DataItem
+        """
+        try:
+            embedding = requests.post(
+                "http://embedding_model:8000/",
+                json={"contents": [item.content]}
+                )
 
-    def add_items(self, items: List[DataItem]) -> None:
-        """Add items to the datastore."""
-        for item in items:
-            embedding = self.get_embedding(item.content)
-            self.embeddings.append(embedding)
-            self.contents.append(item.content)
-            self.sources.append(item.source)
-            
-        print(f"✅ Added {len(items)} items to datastore. Total items: {len(self.contents)}")
+            self.filenames.append(item.filename)
+        except Exception as e:
+            print("Error while adding item to datastore: ", e)
+        embed = embedding.json()["embeddings"]
+        self.embeddings.append(embed)
+        self.contents.append(item.content)
 
     def search(self, query: str, top_k: int = 3) -> List[str]:
         """Search for similar content using cosine similarity."""
@@ -58,3 +67,23 @@ class Datastore:
         vec1 = np.array(vec1)
         vec2 = np.array(vec2)
         return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
+
+
+app = FastAPI()
+datastore = None
+
+@app.on_event("startup")
+def startup():
+    global datastore
+    datastore = Datastore()
+
+@app.post("/")
+def store(request: DatastoreRequest):
+    item = request.item
+
+    try:
+        datastore.add_item(item)
+    except Exception as e:
+        return {"Error": e}
+
+    return {"Response": "200 OK"}

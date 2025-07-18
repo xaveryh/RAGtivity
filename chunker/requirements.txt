@@ -1,0 +1,5 @@
+numpy
+nltk
+docling
+fastapi[standard]
+python-multipart

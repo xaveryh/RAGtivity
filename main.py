@@ -1,6 +1,7 @@
 import glob
 import json
 import os
+from fastapi import FastAPI, Request
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0' 
 from huggingface_hub import login
 from typing import List
@@ -13,6 +14,25 @@ from src import Datastore, Indexer, ResponseGenerator, Evaluator
 DEFAULT_SOURCE_PATH = "sample_data/source/"
 DEFAULT_EVAL_PATH = "sample_data/eval/sample_questions.json"
 HF_TOKEN = os.environ["HF_TOKEN"]
+
+
+app = FastAPI()
+pipeline = None
+
+@app.on_event("startup")
+def startup():
+    global pipeline
+    pipeline = RAGPipeline()
+
+
+
+@app.get("/")
+def query(query: str = ""):
+    if query == "":
+        return {"Response": "Chatbot is online!"}
+    else:
+        return {"Response": pipeline.process_query(query)}
+
 
 
 def main():

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Dict, List, Optional
-from src import Datastore, Evaluator, Indexer, ResponseGenerator, EvaluationResult
+from src import Datastore, Evaluator, Chunker, ResponseGenerator, EvaluationResult
 
 
 @dataclass
@@ -8,7 +8,7 @@ class RAGPipeline:
     """Main RAG pipeline that orchestrates all components."""
     def __init__(self):
         self.datastore = Datastore()
-        self.indexer = Indexer(datastore=self.datastore)
+        self.chunker = Chunker(datastore=self.datastore)
         self.response_generator = ResponseGenerator()
         self.evaluator = Evaluator()
 
@@ -18,8 +18,10 @@ class RAGPipeline:
 
     def add_documents(self, documents: List[str]) -> None:
         """Index a list of documents."""
-        items = self.indexer.index(documents)
-        self.datastore.add_items(items)
+        for document in documents:
+            items = self.chunker.index(documents)
+            for item in items:
+                self.datastore.add_items(items) # TODO: Change
         print(f"✅ Added {len(items)} items to the datastore.")
 
     def process_query(self, query: str) -> str:

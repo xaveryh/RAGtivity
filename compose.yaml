@@ -1,0 +1,38 @@
+services:
+  embedding_model:
+    build:
+      context: ./embedding_model
+    volumes:
+      - ./embedding_model:/app
+      - ./shared:/app/shared
+    container_name: embedding_model
+    # develop:
+    #   watch:
+    #     - action: sync
+    #       path: ./embedding_model
+    #       target: ./app/embedding_model
+
+  chunker:
+    build:
+      context: ./chunker
+    volumes:
+      - ./chunker:/app
+      - ./shared:/app/shared
+    container_name: chunker
+    ports:
+      - "8000:8000"
+    # develop:
+    #   watch:
+    #     - action: sync
+    #       path: ./chunker
+    #       target: ./app/chunker
+    
+  datastore:
+    build:
+      context: ./datastore
+    volumes:
+      - ./datastore:/app
+      - ./shared:/app/shared
+    container_name: datastore
+    ports:
+    - "8001:8000"

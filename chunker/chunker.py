@@ -1,41 +1,73 @@
 import os
 import numpy as np
+from io import BytesIO
 from typing import List
 from docling.document_converter import DocumentConverter
-from src import Datastore
-from .dataitem import DataItem
+from docling.datamodel.base_models import DocumentStream
+import requests
+from shared.dataitem import DataItem
 import nltk
 nltk.download('punkt_tab')
 from nltk.tokenize import sent_tokenize
+from fastapi import FastAPI, File, UploadFile
 
-class Indexer:
-    def __init__(self, datastore):
+app = FastAPI()
+chunker = None
+
+@app.on_event("startup")
+def startup():
+    global chunker
+    chunker = Chunker()
+
+@app.get("/")
+def hello():
+    return {"Response": "Hello!"}
+
+@app.post("/")
+async def chunk(file: UploadFile):
+    chunked = await chunker.chunk(file)
+    return {"chunked": chunked}
+
+
+
+class Chunker:
+    def __init__(self):
         self.converter = DocumentConverter()
-        self.datastore = datastore 
         os.environ["TOKENIZERS_PARALLELISM"] = "false" # Disable tokenizers parallelism to avoid OOM errors.
 
-    def index(self, document_paths: List[str]) -> List[DataItem]:
-        all_items = []  # Collect items from all documents
+    async def chunk(self, document: UploadFile) -> DataItem:
+        # Get files bytes
+        file_bytes = await document.read()
+        # Wrap in BytesIO
+        document_buffer = BytesIO(file_bytes)
+        # Wrap in DocumentStream
+        source = DocumentStream(name=document.filename, stream=document_buffer)
+        # Convert document to docling
+        document_converted = self.converter.convert(source)
+        # Convert to markdown
+        markdown_text = document_converted.document.export_to_markdown()
+        # Tokenize each sentences
+        sentences = sent_tokenize(markdown_text)
         
-        for document_path in document_paths:
-            document = self.converter.convert(document_path)
-            markdown_text = document.document.export_to_markdown()
-            sentences = sent_tokenize(markdown_text)
-            embeddings = [self.datastore.get_embedding(sentence) for sentence in sentences]  # Use instance method
-            print(f"Generated {len(embeddings)} sentence embeddings.")
+        response = requests.post(
+            "http://embedding_model:8000",
+            json={"contents": sentences}
+            )
 
-            similarities = [self.cosine_similarity(embeddings[i], embeddings[i + 1]) for i in range(len(embeddings) - 1)] 
-            breakpoints = self.compute_breakpoints(similarities, method="percentile", threshold=90) 
+        embeddings = response.json()["embeddings"]
+        print(f"Generated {len(embeddings)} sentence embeddings.")
 
-            # Create chunks using the split_into_chunks function, passing the document path as source
-            items = self.split_into_chunks(sentences, breakpoints, source_path=document_path)
 
-            # Print the number of chunks created
-            print(f"Number of semantic chunks: {len(items)}") 
-            
-            all_items.extend(items)  # Add items from this document to the collection
+        similarities = [self.cosine_similarity(embeddings[i], embeddings[i + 1]) for i in range(len(embeddings) - 1)] 
+        breakpoints = self.compute_breakpoints(similarities, method="percentile", threshold=90) 
 
-        return all_items  
+        # Create chunks using the split_into_chunks function, passing the document path as source
+        items    = self.split_into_chunks(sentences, breakpoints, filename=document.filename)
+
+        # Print the number of chunks created
+        print(f"Number of semantic chunks: {len(items)}") 
+
+        return items  
   
 
     def cosine_similarity(self,vec1, vec2):
@@ -87,14 +119,13 @@ class Indexer:
         return [i for i, sim in enumerate(similarities) if sim < threshold_value]
     
     
-    def split_into_chunks(self, sentences, breakpoints, source_path=""):
+    def split_into_chunks(self, sentences, breakpoints, filename=""):
         """
-        Splits sentences into semantic chunks and returns DataItem objects.
 
         Args:
         sentences (List[str]): List of sentences.
         breakpoints (List[int]): Indices where chunking should occur.
-        source_path (str): Path to the source document.
+        filename (str): Name of the document.
 
         Returns:
         List[DataItem]: List of DataItem objects with content and source.
@@ -107,14 +138,14 @@ class Indexer:
             # Create chunk content from sentences
             chunk_content = ". ".join(sentences[start:bp + 1]) + "."
             # Create DataItem object
-            data_item = DataItem(content=chunk_content, source=source_path)
+            data_item = DataItem(content=chunk_content, filename=filename)
             chunks.append(data_item)
             start = bp + 1  # Update the start index to the next sentence after the breakpoint
 
         # Append the remaining sentences as the last chunk
         if start < len(sentences):
             chunk_content = ". ".join(sentences[start:]) + "."
-            data_item = DataItem(content=chunk_content, source=source_path)
+            data_item = DataItem(content=chunk_content, filename=filename)
             chunks.append(data_item)
         
         return chunks  # Return the list of DataItem objects

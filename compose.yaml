@@ -6,12 +6,7 @@ services:
       - ./embedding_model:/app
       - ./shared:/app/shared
     container_name: embedding_model
-    # develop:
-    #   watch:
-    #     - action: sync
-    #       path: ./embedding_model
-    #       target: ./app/embedding_model
-
+    
   chunker:
     build:
       context: ./chunker
@@ -19,12 +14,9 @@ services:
       - ./chunker:/app
       - ./shared:/app/shared
     container_name: chunker
-    # develop:
-    #   watch:
-    #     - action: sync
-    #       path: ./chunker
-    #       target: ./app/chunker
-    
+    depends_on:
+      - embedding_model
+
   datastore:
     build:
       context: ./datastore
@@ -32,6 +24,8 @@ services:
       - ./datastore:/app
       - ./shared:/app/shared
     container_name: datastore
+    depends_on:
+      - embedding_model
 
   pipeline:
     build:
@@ -42,3 +36,13 @@ services:
     container_name: pipeline
     ports:
       - "8000:8000"
+    depends_on:
+      - chunker
+      - datastore
+      - generator
+    
+  generator:
+    build:
+      context: ./generator
+    volumes:
+      - ./generator:/app

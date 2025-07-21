@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional
 from fastapi import FastAPI, UploadFile
 import requests
-
+import urllib.parse
 
 class RAGPipeline:
     """Main RAG pipeline that orchestrates all components."""
@@ -39,14 +39,36 @@ class RAGPipeline:
             if not response.ok:
                 raise Exception(f"Something went wrong while chunking the document. Response code: {response.status_code}. {response.text}")
 
-    # def process_query(self, query: str) -> str:
-    #     search_results = self.datastore.search(query)
-    #     print(f"✅ Found {len(search_results)} results for query: {query}\n")
+    def process_query(self, query: str) -> str:
+        # Search the datastore for relevant chunks
+        encoded_query = urllib.parse.quote(query)
+        response = requests.get(f"http://datastore:8000/?query={encoded_query}")
+        if not response.ok:
+            raise Exception(f"Something went wrong while processing query. Response code: {response.status_code}. {response.text}")
 
-    #     for i, result in enumerate(search_results):
-    #         print(f"🔍 Result {i+1}: {result}\n")
-    #     response = self.response_generator.generate_response(query, search_results)
-    #     return response
+        
+        search_results = response.json()
+
+        prompt = "<context>"
+        for result in search_results:
+            prompt += result + "\n"
+
+        prompt += "</context>\n"
+        
+        prompt += query
+
+        print("prompt:\n", prompt)
+        # Get response from the generator model
+        response = requests.get(
+            f'http://generator:8000/?prompt="{prompt}"',
+        )
+
+        if not response.ok:
+            raise Exception(f"Something went wrong while invoking the AI model. Response code: {response.status_code}. {response.text}")
+        
+        answer = response.json()
+        print(answer)
+        return answer
 
     # def evaluate(
     #     self, sample_questions: List[Dict[str, str]]
@@ -90,8 +112,8 @@ def startup():
     pipeline = RAGPipeline()
 
 @app.get("/")
-def hello():
-    return {"Response": "Hello!"}
+def query(query: str):
+    return pipeline.process_query(query)
 
 @app.post("/")
 async def upload(files: List[UploadFile]):

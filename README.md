@@ -1,90 +1,26 @@
 # Simple RAG Pipeline
 
-This project is a beginner-friendly tutorial project for building a Retrieval Augmented Generation (RAG) system. It demonstrates how to index documents, retrieve relevant content, generate AI-powered responses, and evaluate results—all through a command line interface (CLI).
+This project is a beginner-friendly tutorial project for building a Retrieval Augmented Generation (RAG) system.
 
-## Overview
+# Setup 
+Make sure docker is installed in your system. If not, follow [this](https://docs.docker.com/compose/install/) page to get it installed. 
 
-The RAG Framework lets you:
+Before starting the service, go into generator -> Dockerfile. Replace the _token_here_ keyword with your gemini API key.
 
-- **Index Documents:** Process and break documents (e.g., PDFs) into smaller, manageable chunks.
-- **Store & Retrieve Information:** Save document embeddings in a vector database (using LanceDB) and search using similarity.
-- **Generate Responses:** Use an AI model (via the OpenAI API) to provide concise answers based on the retrieved context.
-- **Evaluate Responses:** Compare the generated response against expected answers and view the reasoning behind the evaluation.
-
-## Architecture
-
-- **Pipeline (src/rag_pipeline.py):**  
-  Orchestrates the process using:
-
-  - **Datastore:** Manages embeddings and vector storage.
-  - **Indexer:** Processes documents and creates data chunks. Two versions are available—a basic PDF indexer and one using the Docling package.
-  - **Retriever:** Searches the datastore to pull relevant document segments.
-  - **ResponseGenerator:** Generates answers by calling the AI service.
-  - **Evaluator:** Compares the AI responses to expected answers and explains the outcome.
-
-- **Interfaces (interface/):**  
-  Abstract base classes define contracts for all components (e.g., BaseDatastore, BaseIndexer, BaseRetriever, BaseResponseGenerator, and BaseEvaluator), making it easy to extend or swap implementations.
-
-## Installation
-
-#### Set Up a Virtual Environment (Optional but Recommended)
+To start the pipeline service, enter the following command.
 
 ```bash
-python -m venv venv
-source venv/bin/activate   # On Windows: venv\Scripts\activate
+docker compose up
 ```
 
-#### Install Dependencies
+Note: If using linux, you might need to prefix the command with `sudo` run as privileged command.
 
-```bash
-pip install -r requirements.txt
-```
 
-## Usage
+# Usage
+Currently, there are only 2 things that the pipeline can do:
+- Add documents into the knowledge base
+- Query the model 
 
-The CLI provides several commands to interact with the RAG pipeline. By default, they will use the source/eval paths specified in `main.py`, but there are flags to override them.
+To add documents into the knowledge base, upload the documents via POST to `http://127.0.0.1:8000/`. This can be done minimally with the curl CLI with `curl http://127.0.0.1:8000 -F "files=@name_of_the_file.pdf"`
 
-```python
-DEFAULT_SOURCE_PATH = "sample_data/source/"
-DEFAULT_EVAL_PATH = "sample_data/eval/sample_questions.json"
-```
-
-#### Run the Full Pipeline
-
-This command resets the datastore, indexes documents, and evaluates the model.
-
-```bash
-python main.py run
-```
-
-#### Reset the Database
-
-Clears the vector database.
-
-```bash
-python main.py reset
-```
-
-#### Add Documents
-
-Index and embed documents. You can specify a file or directory path.
-
-```bash
-python main.py add -p "sample_data/source/"
-```
-
-#### Query the Database
-
-Search for information using a query string.
-
-```bash
-python main.py query "What is the opening year of The Lagoon Breeze Hotel?"
-```
-
-#### Evaluate the Model
-
-Use a JSON file (with question/answer pairs) to evaluate the response quality.
-
-```bash
-python main.py evaluate -f "sample_data/eval/sample_questions.json"
-```
+To query the model, simply perform a GET request to `http://127.0.0.1:8000/` with the query parameter as the prompt to the model. For example, by typing `http://127.0.0.1:8000/?query=what is swan lagoon` to the browser.

@@ -49,7 +49,7 @@ class Datastore:
         
         # Encode query
         response = requests.post(
-            "http://127.0.0.1:8000",
+            "http://embedding_model:8000",
             json=[query]
         )
         if not response.ok:
@@ -70,8 +70,8 @@ class Datastore:
 
     def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
         """Calculate cosine similarity between two vectors."""
-        vec1 = np.array(vec1)
-        vec2 = np.array(vec2)
+        vec1 = np.squeeze(np.array(vec1))
+        vec2 = np.squeeze(np.array(vec2))
         return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
 
 
@@ -86,4 +86,9 @@ def startup():
 @app.post("/")
 def store(items: List[DataItem]):
     datastore.add_items(items)
-    return {"Response": "Document successfully stored"}
+    return "Document successfully stored"
+
+@app.get("/")
+def search(query: str) -> List[str]:
+    contents = datastore.search(query)
+    return contents

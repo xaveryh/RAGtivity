@@ -39,26 +39,24 @@ class RAGPipeline:
             if not response.ok:
                 raise Exception(f"Something went wrong while chunking the document. Response code: {response.status_code}. {response.text}")
 
-    def process_query(self, query: str) -> str:
+    def process_query(self, query: str) -> dict:
         # Search the datastore for relevant chunks
         encoded_query = urllib.parse.quote(query)
         response = requests.get(f"http://datastore:8000/?query={encoded_query}")
         if not response.ok:
             raise Exception(f"Something went wrong while processing query. Response code: {response.status_code}. {response.text}")
 
-        
         search_results = response.json()
-
         prompt = "<context>"
         for result in search_results:
-            prompt += result + "\n"
+            prompt += f"From {result['filename']} (chunk {result['chunk_id']}):\n"
+            prompt += result['content'] + "\n\n"
 
         prompt += "</context>\n"
         
         prompt += query
 
         print("prompt:\n", prompt)
-        # Get response from the generator model
         response = requests.get(
             f'http://generator:8000/?prompt="{prompt}"',
         )
@@ -68,7 +66,23 @@ class RAGPipeline:
         
         answer = response.json()
         print(answer)
-        return answer
+        
+        # Format the final response as JSON
+        final_response = {
+            "answer": answer,
+            "sources": []
+        }
+        
+        for i, result in enumerate(search_results, 1):
+            source = {
+                "filename": result['filename'],
+                "chunk_id": result['chunk_id'],
+                "similarity_score": round(result['similarity_score'], 3),
+                "content": result['content']
+            }
+            final_response["sources"].append(source)
+        
+        return final_response
 
     # def evaluate(
     #     self, sample_questions: List[Dict[str, str]]
@@ -100,8 +114,6 @@ class RAGPipeline:
     #     # Evaluate a single question/answer pair.
     #     response = self.process_query(question)
     #     return self.evaluator.evaluate(question, response, expected_answer, self.datastore)
-
-
 
 app = FastAPI()
 pipeline = None

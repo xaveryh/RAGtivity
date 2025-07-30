@@ -41,7 +41,7 @@ class Datastore:
                 metadatas=[{"filename": item.filename}]
             )
 
-    def search(self, query: str, top_k: int = 3) -> List[str]:
+    def search(self, query: str, top_k: int = 3) -> List[dict]:
         response = requests.post("http://embedding_model:8000/", json=[query])
         if not response.ok:
             raise Exception(f"Error while encoding query. Status code: {response.status_code}. {response.text}")
@@ -49,7 +49,7 @@ class Datastore:
         embeddings = response.json()
         query_embedding = embeddings[0] 
         
-        all_docs = self.collection.get(include=["documents", "embeddings"])
+        all_docs = self.collection.get(include=["documents", "embeddings", "metadatas"])
         
         if not all_docs['documents']:
             return []
@@ -60,9 +60,18 @@ class Datastore:
             similarities.append(similarity)
         
         top_indices = np.argsort(similarities)[-top_k:][::-1]
-        result_content = [all_docs['documents'][i] for i in top_indices]
-        
-        return result_content
+
+        result_list = []
+
+        for i in top_indices:
+            result_list.append({
+                "content": all_docs['documents'][i],
+                "filename": all_docs['metadatas'][i]['filename'],
+                "chunk_id": all_docs['ids'][i],
+                "similarity_score": similarities[i]
+            })
+
+        return result_list
 
     def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
         vec1 = np.squeeze(np.array(vec1))
@@ -83,6 +92,6 @@ def store(items: List[DataItem]):
     return "Document successfully stored"
 
 @app.get("/")
-def search(query: str) -> List[str]:
-    contents = datastore.search(query)
-    return contents
+def search(query: str) -> List[dict]:
+    result_list = datastore.search(query)
+    return result_list

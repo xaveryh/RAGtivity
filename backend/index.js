@@ -26,13 +26,9 @@ async function connect_mongo() {
     console.log("Connected to MongoDB")
   }
   catch (err) {
-    console.error(`Error while connecting to MongoDB. `, e)
+    console.error(`Error while connecting to MongoDB. `, err)
   }
 }
-
-app.use(cors());
-app.use(fileUpload())
-app.use(express.json());
 
 // Get all user's document
 app.get("/documents", async (req, res) => {

@@ -7,6 +7,11 @@ import path from "node:path"
 import dotenv from "dotenv"
 import ragRoutes from './ragRoutes.js';
 import fs from "fs"
+import {
+  S3Client,
+  HeadBucketCommand,
+  PutObjectCommand
+} from "@aws-sdk/client-s3"
 
 dotenv.config()
 
@@ -15,6 +20,7 @@ const PORT = 4000;
 const URI = process.env.MONGO_URI
 const mongoClient = new MongoClient(URI)
 const dbName = "ragtivity"
+const s3client = new S3Client({})
 
 app.use(cors());
 app.use(fileUpload()); 
@@ -30,6 +36,22 @@ async function connect_mongo() {
     console.error(`Error while connecting to MongoDB. `, err)
   }
 }
+
+app.get("/", async (req, res) => {
+  const bucket = {
+    Bucket: "ragtivity",
+  }
+  const headBucketCommand = new HeadBucketCommand(bucket)
+  const response = await s3client.send(headBucketCommand) 
+
+  if (response.$metadata.httpStatusCode == 200) {
+    return res.send("Bucket exists!")
+  }
+  else {
+    return res.status(500).send("S3 bucket does not exist! Contact developers")
+  }
+
+}) 
 
 // Get all user's document
 app.get("/documents", async (req, res) => {

@@ -10,7 +10,8 @@ import fs from "fs"
 import {
   S3Client,
   HeadBucketCommand,
-  PutObjectCommand
+  PutObjectCommand,
+  DeleteObjectsCommand
 } from "@aws-sdk/client-s3"
 
 dotenv.config()
@@ -21,6 +22,7 @@ const URI = process.env.MONGO_URI
 const mongoClient = new MongoClient(URI)
 const dbName = "ragtivity"
 const s3client = new S3Client({})
+const S3_BUCKET_NAME = "ragtivity"
 
 app.use(cors());
 app.use(fileUpload()); 
@@ -86,46 +88,67 @@ app.post("/documents", async (req, res) => {
   const userEmail = req.body.email
   let files = req.files.files
   
-  const storagePath = "files"
-  let uploadPath
+  let uploadFileInput
+  let uploadFileCommand
+  let uploadFileResponse
+
+  // Check if it is a single file or an array of files
+  if (Array.isArray(files) == false) {
+    files = [files]
+  }
 
   // Get user collection
   const usersCollection = mongoClient.db(dbName).collection("users")
   const queryGetUser = {email: userEmail}
   let filesToInsert = []
 
-  if (Array.isArray(files) == false) {
-    files = [files]
-  }
 
-  // Loop through each file uploaded and store file to storage location
+  // Loop through each file to upload to storage and record in database
  for (const file of files) {
-    uploadPath = path.join(storagePath, userEmail, file.name)
+    let uploadFilename = `${userEmail}/${file.name}`
+    
+    // Upload to S3
+    uploadFileInput = {
+      Body: file.data,
+      Bucket: S3_BUCKET_NAME,
+      Key: uploadFilename
+    }
+    uploadFileCommand = new PutObjectCommand(uploadFileInput)
+    uploadFileResponse = await s3client.send(uploadFileCommand)
+    
+    // Check if storage upload failed
+    if (uploadFileResponse.$metadata.httpStatusCode != 200) {
+      // If some files have been previously uploaded, delete them from the storage to prevent partial uploads
+      if (filesToInsert.length != 0) {
+        // Build the delete command input
+        let deleteObjectsInput = {
+          Bucket: S3_BUCKET_NAME,
+          Delete: {
+            Objects: filesToInsert.map(item => ({Key: item.name}))
+          }
+        }
+        const deleteObjectsCommand = new DeleteObjectsCommand(deleteObjectsInput)
+        const response = await s3client.send(deleteObjectsCommand)
+      }
 
-    // Check if path exists. If not, make directory recursively
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(path.dirname(uploadPath), {recursive: true})
+      return res.status(500).json({
+        "message": "Something went wrong while uploading file to S3 storage",
+        "AWS_code": uploadFileResponse.$metadata.httpStatusCode 
+      })
     }
 
     // Check if there's a duplicate file
-    const filenameDuplicate = fs.existsSync(uploadPath)
+    // const filenameDuplicate = fs.existsSync(uploadPath)
 
-    // If there is, check if content is the same by comparing the content's MD5 hash value
-    if (filenameDuplicate) {
-      return res.status(400).send("FILENAME_EXISTS")
-    }
-
-    // Move file to storage location
-    try {
-      await file.mv(uploadPath)
-    }
-    catch (err) {
-        return res.status(500).send("Something went wrong while uploading file to storage. Error message: " + err)
-    }
-
+    // // If there is, check if content is the same by comparing the content's MD5 hash value
+    // if (filenameDuplicate) {
+    //   return res.status(400).send("FILENAME_EXISTS")
+    // }
+    
+    // Keep a record of each file that has been uploaded to storage to insert them into the database
     filesToInsert.push({
       filename: file.name,
-      uploadPath: uploadPath
+      uploadedFilename: uploadFilename
     })
   }
 

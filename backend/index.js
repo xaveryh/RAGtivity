@@ -11,7 +11,8 @@ import {
   S3Client,
   HeadBucketCommand,
   PutObjectCommand,
-  DeleteObjectsCommand
+  DeleteObjectsCommand,
+  DeleteObjectCommand
 } from "@aws-sdk/client-s3"
 
 dotenv.config()
@@ -181,7 +182,6 @@ app.post("/documents", async (req, res) => {
 })
 
 app.post("/delete_document", async (req, res) => {
-  console.log(req.body)
   const { email, filename } = req.body
   const fileStoragePath = path.join("files", email, filename)
 
@@ -189,10 +189,35 @@ app.post("/delete_document", async (req, res) => {
   
   const queryIdentifyUser = {email: email}
   const queryDeleteFile = {$pull: {documents: {filename: filename}}}
+  const queryDocumentStoragePath = {
+    projection: {
+      documents: {
+        $elemMatch: {filename: filename}
+      }
+    }
+  }
+
+  let documentStoragePath
+  
+  try {
+    documentStoragePath = await usersCollection.findOne(queryIdentifyUser, queryDocumentStoragePath)
+    documentStoragePath = documentStoragePath.documents[0].uploadedFilename
+  } 
+  catch (err) {
+    return res.status(500).send("Something went wrong while querying if document exists or not. Error message: " + err)
+  }
+  const deleteObjectInput = {
+    Bucket: S3_BUCKET_NAME,
+    Key: documentStoragePath,
+  }
+  const deleteObjectCommand = new DeleteObjectCommand(deleteObjectInput)
+  const deleteObjectResponse = await s3client.send(deleteObjectCommand)
+  if (deleteObjectResponse.$metadata.httpStatusCode != 204) {
+    return res.status(500).send("Something went wrong while deleting object from S3 bucket")
+  }
   
   try {
     const deleteFileFromDB = await usersCollection.updateOne(queryIdentifyUser, queryDeleteFile)
-    const deleteFileFromStorage = fs.unlinkSync(fileStoragePath)
 
   }
   catch (err) {

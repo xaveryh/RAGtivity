@@ -22,7 +22,9 @@ const PORT = 4000;
 const URI = process.env.MONGO_URI
 const mongoClient = new MongoClient(URI)
 const dbName = "ragtivity"
-const s3client = new S3Client({})
+const s3client = new S3Client({
+  region: "ap-southeast-2"
+})
 const S3_BUCKET_NAME = "ragtivity"
 
 app.use(cors());

@@ -183,10 +183,10 @@ app.post("/documents", async (req, res) => {
 
 app.post("/delete_document", async (req, res) => {
   const { email, filename } = req.body
-  const fileStoragePath = path.join("files", email, filename)
 
   const usersCollection = mongoClient.db(dbName).collection("users")
   
+  // Build queries for MongoDB
   const queryIdentifyUser = {email: email}
   const queryDeleteFile = {$pull: {documents: {filename: filename}}}
   const queryDocumentStoragePath = {
@@ -197,8 +197,8 @@ app.post("/delete_document", async (req, res) => {
     }
   }
 
+  // Get the target document's storage path
   let documentStoragePath
-  
   try {
     documentStoragePath = await usersCollection.findOne(queryIdentifyUser, queryDocumentStoragePath)
     documentStoragePath = documentStoragePath.documents[0].uploadedFilename
@@ -206,12 +206,15 @@ app.post("/delete_document", async (req, res) => {
   catch (err) {
     return res.status(500).send("Something went wrong while querying if document exists or not. Error message: " + err)
   }
+
+  // Delete the object from S3 bucket
   const deleteObjectInput = {
     Bucket: S3_BUCKET_NAME,
     Key: documentStoragePath,
   }
   const deleteObjectCommand = new DeleteObjectCommand(deleteObjectInput)
   const deleteObjectResponse = await s3client.send(deleteObjectCommand)
+  // Check for errors in the response
   if (deleteObjectResponse.$metadata.httpStatusCode != 204) {
     return res.status(500).send("Something went wrong while deleting object from S3 bucket")
   }

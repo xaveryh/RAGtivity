@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from "prop-types"
 
 export default function DocumentListItem({ 
     doc, 
@@ -55,4 +56,12 @@ export default function DocumentListItem({
             </div>
         </div>
     );
+}
+
+DocumentListItem.propTypes = {
+    doc: PropTypes.object.isRequired,
+    index: PropTypes.number.isRequired,
+    isIncluded: PropTypes.bool.isRequired,
+    onToggleIncluded: PropTypes.func.isRequired,
+    onRemove: PropTypes.func.isRequired
 }

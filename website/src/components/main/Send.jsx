@@ -1,5 +1,6 @@
 import React from 'react';
 import sendIcon from "../../assets/send.png"
+import PropTypes from "prop-types"
 
 export default function Send({ onSend }) {
     const handleSend = () => {
@@ -28,4 +29,8 @@ export default function Send({ onSend }) {
             />
         </div>
     );
+}
+
+Send.propTypes = {
+    onSend: PropTypes.func.isRequired
 }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import DocumentListItem from '../document/document_list_item';
 import Add_document from '../main/Add_document';
+import PropTypes from "prop-types"
 
 export default function DocumentWindow({ documents = [], onRemoveDocument, onAddDocuments }) {
     const [includedDocuments, setIncludedDocuments] = useState(
@@ -169,4 +170,10 @@ export default function DocumentWindow({ documents = [], onRemoveDocument, onAdd
             </div>
         </div>
     );
+}
+
+DocumentWindow.propTypes = {
+    documents: PropTypes.array,
+    onRemoveDocument: PropTypes.func.isRequired,
+    onAddDocuments: PropTypes.func.isRequired
 }

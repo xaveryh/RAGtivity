@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router'
+import PropTypes from "prop-types"
 
-function Login({ setLoggedInEmail }) {
+export default function Login({ setLoggedInEmail }) {
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -60,6 +61,7 @@ function Login({ setLoggedInEmail }) {
       }
     } catch (err) {
       setErrors({ general: 'Network error.' })
+      console.error(err)
     } finally {
       setIsLoading(false)
     }
@@ -134,4 +136,6 @@ function Login({ setLoggedInEmail }) {
   )
 }
 
-export default Login 
+Login.propTypes = {
+  setLoggedInEmail: PropTypes.func.isRequired
+}

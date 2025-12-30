@@ -1,8 +1,9 @@
 import { useState } from "react";
 import Add_document from "../main/Add_document"
 import Send from "../main/Send"
+import PropTypes from "prop-types"
 
-function Main({loggedInEmail, onAddDocuments}) {
+export default function Main({loggedInEmail, onAddDocuments}) {
     const [query, setQuery] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [conversation, setConversation] = useState([]);
@@ -203,4 +204,8 @@ function Main({loggedInEmail, onAddDocuments}) {
     )
 }
 
-export default Main
+
+Main.propTypes = {
+    loggedInEmail: PropTypes.string.isRequired,
+    onAddDocuments: PropTypes.func.isRequired
+}

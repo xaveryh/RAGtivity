@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import newDocIcon from "../../assets/new-document.png"
+import PropTypes from "prop-types"
 
 export default function Add_document({ onAddDocuments }) {
     const handleDrop = useCallback((event) => {
@@ -51,4 +52,8 @@ export default function Add_document({ onAddDocuments }) {
             />
         </div>
     );
+}
+
+Add_document.propTypes = {
+    onAddDocuments: PropTypes.func.isRequired
 }

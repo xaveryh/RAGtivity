@@ -2,7 +2,7 @@ import { useState } from 'react';
 import './Signup.css';
 import { NavLink, useNavigate } from 'react-router';
 
-function Signup() {
+export default function Signup() {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -54,6 +54,7 @@ function Signup() {
       }
     } catch (err) {
       setErrors({ general: 'Network error.' });
+      console.error(err)
     } finally {
       setIsLoading(false);
     }
@@ -114,5 +115,3 @@ function Signup() {
     </div>
   );
 }
-
-export default Signup; 

@@ -1,4 +1,5 @@
 import { Dialog, DialogPanel, DialogTitle, Button } from '@headlessui/react'
+import PropTypes from "prop-types"
 
 export default function FileDuplicatePopup({ openDuplicatePopup, setOpenDuplicatePopup }) {
   return (
@@ -28,4 +29,9 @@ export default function FileDuplicatePopup({ openDuplicatePopup, setOpenDuplicat
         </div>
       </Dialog>
   )
+}
+
+FileDuplicatePopup.propTypes = {
+  openDuplicatePopup: PropTypes.func.isRequired,
+  setOpenDuplicatePopup: PropTypes.func.isRequired
 }

@@ -1,6 +1,5 @@
 import express from 'express';
 import axios from 'axios';
-import FormData from 'form-data';
 
 const router = express.Router();
 const RAG_URL = process.env.RAG_URL || 'http://localhost:8000';

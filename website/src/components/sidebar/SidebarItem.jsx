@@ -1,4 +1,6 @@
-function SidebarItem({ icon, text, isActive = false }) {
+import PropTypes from "prop-types"
+
+export default function SidebarItem({ icon, text, isActive = false }) {
     return (
         <div 
             className={`flex items-center gap-3 rounded-md py-2 px-2 cursor-pointer transition-colors ${
@@ -13,4 +15,8 @@ function SidebarItem({ icon, text, isActive = false }) {
     );
 }
 
-export default SidebarItem
+SidebarItem.propTypes = {
+    icon: PropTypes.string.isRequired,
+    text: PropTypes.string.isRequired,
+    isActive: PropTypes.bool
+}

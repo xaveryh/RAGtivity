@@ -1,11 +1,11 @@
-import { useState } from "react";
 import chatIcon from "../../assets/chat.png"
 import documentIcon from "../../assets/docs.png"
 import settingsIcon from "../../assets/settings.png"
 import SidebarItem from "../sidebar/SidebarItem";
 import { NavLink, useLocation } from "react-router";
+import PropTypes from "prop-types"
 
-function Sidebar({ documents = [] }) {
+export default function Sidebar({ documents = [] }) {
     return (
         
         <div className="w-1/7 h-screen py-6 px-5 bg-lightgrey flex flex-col justify-between">
@@ -45,4 +45,6 @@ function Sidebar({ documents = [] }) {
     );
 }
 
-export default Sidebar
+Sidebar.propTypes = {
+    documents: PropTypes.array
+}

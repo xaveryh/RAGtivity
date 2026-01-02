@@ -1,5 +1,0 @@
-fastapi
-uvicorn
-langchain-text-splitters
-sentence-transformers
-torch

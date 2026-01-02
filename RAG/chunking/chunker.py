@@ -1,24 +1,26 @@
+from fastapi import FastAPI
+from pydantic import BaseModel
+from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from sentence_transformers import SentenceTransformer
+from config import embeddings
+from database import vector_store
 
-class ChunkEmbedService:
-    def __init__(
-        self,
+app = FastAPI(title="Document Loader Service")
+
+class LoadRequest(BaseModel):
+    filepath: str
+
+def split_and_store(docs):
+    splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=200,
-        model_name="all-MiniLM-L6-v2"
-    ):
-        self.splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            add_start_index=True
-        )
-        self.model = SentenceTransformer(model_name)
+        add_start_index=True
+    )
+    splits = splitter.split_documents(docs)
+    vector_store.add_documents(splits)
 
-    def process(self, text: str):
-        docs = self.splitter.create_documents([text])
-
-        chunks = [d.page_content for d in docs]
-        embeddings = self.model.encode(chunks).tolist()
-
-        return chunks, embeddings
+@app.post("/load/pdf")
+def load_pdf(req: LoadRequest):
+    docs = PyPDFLoader(req.filepath).load()
+    split_and_store(docs)
+    return {"status": "ok", "chunks": len(docs)}

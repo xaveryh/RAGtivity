@@ -9,7 +9,7 @@ import re
 import ast
 import requests
 
-DOCUMENT_LOADER_URL = "http://document-loader:8001/load/pdf"
+DOCUMENT_LOADER_URL = "http://document_loader:8001/load/pdf"
 UPLOAD_DIR = "/uploaded_docs"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -61,21 +61,13 @@ def query_rag(request: QueryRequest):
 #this is the uploading document that call the chunking service
 @app.post("/upload")
 def upload_document(file: UploadFile = File(...)):
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
-
-    with open(file_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-
     # Call document loader container
     response = requests.post(
         DOCUMENT_LOADER_URL,
-        json={"filepath": file_path}
+        files={"file": (file.filename, file.file)}
     )
 
-    return {
-        "message": "File uploaded and processed",
-        "loader_response": response.json()
-    }
+    return response.json()
 
 
 @app.get("/documents")

@@ -4,6 +4,7 @@ langchain-mongodb
 langchain-google-genai
 langchain-text-splitters
 langchain-huggingface 
+langchain-chroma
 text-generation 
 transformers 
 google-search-results 

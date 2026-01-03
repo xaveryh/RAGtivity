@@ -3,13 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from agents import create_rag_agent
 from database import vector_store
-from document_loader import DocumentLoader
 import os
 import shutil
 import re
 import ast
+import requests
 
-UPLOAD_DIR = "./uploaded_docs"
+DOCUMENT_LOADER_URL = "http://document-loader:8001/load/pdf"
+UPLOAD_DIR = "/uploaded_docs"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app = FastAPI(title="RAG API")
@@ -57,27 +58,24 @@ def query_rag(request: QueryRequest):
 
     return {"answer": response_text, "sources": sources}
 
-
+#this is the uploading document that call the chunking service
 @app.post("/upload")
 def upload_document(file: UploadFile = File(...)):
-    """
-    Upload a PDF document and add it to the vector store.
-    """
     file_path = os.path.join(UPLOAD_DIR, file.filename)
-    
-    # Save the uploaded file
+
     with open(file_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
-    
-    # Load and store in vector store
-    loader = DocumentLoader(file_path)
-    loader.pdf_loader()  # Only PDF supported for now
-    
-    # Count chunks in vector store for this file
-    all_docs = vector_store._collection.get()
-    chunks = sum(1 for m in all_docs["metadatas"] if m.get("filename") == file.filename)
-    
-    return {"message": f"{file.filename} uploaded successfully", "chunks": chunks}
+
+    # Call document loader container
+    response = requests.post(
+        DOCUMENT_LOADER_URL,
+        json={"filepath": file_path}
+    )
+
+    return {
+        "message": "File uploaded and processed",
+        "loader_response": response.json()
+    }
 
 
 @app.get("/documents")

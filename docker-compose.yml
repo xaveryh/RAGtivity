@@ -3,14 +3,14 @@ services:
     ports:
       - "4000:4000"
     build:
-        context: ./backend
-        dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     env_file:
       - .env
     volumes:
       - ./backend:/app
       - node_modules:/app/node_modules
-  
+
   frontend:
     ports:
       - "5173:5173"
@@ -19,7 +19,27 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./website:/app
-      # - node_modules:/app/node_modules
+
+  rag:
+    ports:
+      - "8000:8000"
+    build:
+      context: ./RAG
+      dockerfile: Dockerfile
+    volumes:
+      - ./RAG:/app
+      - ./RAG/uploaded_docs:/uploaded_docs
+    depends_on:
+      - chunking
+
+  chunking:
+    ports:
+      - "8001:8001"
+    build:
+      context: ./RAG/chunking
+      dockerfile: Dockerfile
+    volumes:
+      - ./RAG/uploaded_docs:/uploaded_docs
 
 volumes:
-  node_modules: 
+  node_modules:

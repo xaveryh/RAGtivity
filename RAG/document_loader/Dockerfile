@@ -8,4 +8,4 @@ RUN pip install fastapi uvicorn langchain langchain-community langchain-huggingf
 
 EXPOSE 8001
 
-CMD ["uvicorn", "chunker:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["uvicorn", "document_loader:app", "--host", "0.0.0.0", "--port", "8001"]

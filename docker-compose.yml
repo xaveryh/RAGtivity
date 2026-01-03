@@ -30,13 +30,13 @@ services:
       - ./RAG:/app
       - ./RAG/uploaded_docs:/uploaded_docs
     depends_on:
-      - chunking
+      - document_loader
 
-  chunking:
+  document_loader:
     ports:
       - "8001:8001"
     build:
-      context: ./RAG/chunking
+      context: ./RAG/document_loader
       dockerfile: Dockerfile
     volumes:
       - ./RAG/uploaded_docs:/uploaded_docs

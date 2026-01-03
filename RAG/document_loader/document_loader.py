@@ -1,5 +1,4 @@
 from fastapi import FastAPI, UploadFile
-from pydantic import BaseModel
 import tempfile
 import shutil
 from langchain_community.document_loaders import PyPDFLoader
@@ -11,8 +10,6 @@ embeddings = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-mpnet-base-v2"
 )
 
-class LoadRequest(BaseModel):
-    filepath: str
 
 def split_and_get_embeddings(docs_content):
     splitter = RecursiveCharacterTextSplitter(

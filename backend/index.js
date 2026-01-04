@@ -232,7 +232,10 @@ app.post("/delete_document", async (req, res) => {
   const { email, filename } = req.body
 
   const usersCollection = mongoClient.db(dbName).collection("users")
+  const chunkedCollection = mongoClient.db(dbName).collection("chunked_documents")
   
+  let userId
+
   // Build queries for MongoDB
   const queryIdentifyUser = {email: email}
   const queryDeleteFile = {$pull: {documents: {filename: filename}}}
@@ -243,17 +246,18 @@ app.post("/delete_document", async (req, res) => {
       }
     }
   }
-
+  
   // Get the target document's storage path
   let documentStoragePath
   try {
     documentStoragePath = await usersCollection.findOne(queryIdentifyUser, queryDocumentStoragePath)
+    userId = documentStoragePath._id
     documentStoragePath = documentStoragePath.documents[0].uploadedFilename
   } 
   catch (err) {
     return res.status(500).send("Something went wrong while querying if document exists or not. Error message: " + err)
   }
-
+  
   // Delete the object from S3 bucket
   const deleteObjectInput = {
     Bucket: S3_BUCKET_NAME,
@@ -266,12 +270,27 @@ app.post("/delete_document", async (req, res) => {
     return res.status(500).send("Something went wrong while deleting object from S3 bucket")
   }
   
+  // Build query to delete chunked documents from MongoDB chunked_documents collection
+  const queryDeleteChunkedDocuments = {
+    userId: userId,
+    filename: filename
+  }
+  // Delete file record from MongoDB
+  const mongoSession = mongoClient.startSession()
   try {
-    await usersCollection.updateOne(queryIdentifyUser, queryDeleteFile)
-
+    // Start ACID transaction
+    mongoSession.startTransaction()
+    // Delete the filename from the user's file list
+    await usersCollection.updateOne(queryIdentifyUser, queryDeleteFile, { mongoSession })
+    await chunkedCollection.deleteMany(queryDeleteChunkedDocuments, { mongoSession })
+    // Commit ACID transaction
+    mongoSession.commitTransaction()
   }
   catch (err) {
-    return res.status(500).send("Something went wrong while deleting document. Error message: " + err)
+    mongoSession.abortTransaction()
+    return res.status(500).send("Something went wrong while deleting file records from MongoDB. Error message: " + err)
+  } finally {
+    mongoSession.endSession()
   }
 
   return res.status(200).send("Document successfully deleted")

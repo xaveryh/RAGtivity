@@ -1,10 +1,11 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
 import cors from 'cors';
-import { MongoClient } from 'mongodb';
+import { MongoClient, MongoServerError } from 'mongodb';
 import fileUpload from "express-fileupload"
 import dotenv from "dotenv"
 import ragRoutes from './ragRoutes.js';
+import { Blob } from "buffer"
 import {
   S3Client,
   HeadBucketCommand,
@@ -89,23 +90,27 @@ app.post("/documents", async (req, res) => {
   const userEmail = req.body.email
   let files = req.files.files
   
+  let chunk_and_embeddings
   let uploadFileInput
   let uploadFileCommand
   let uploadFileResponse
-
+  
   // Check if it is a single file or an array of files
   if (Array.isArray(files) == false) {
     files = [files]
   }
-
+  
   // Get user collection
   const usersCollection = mongoClient.db(dbName).collection("users")
+  const chunkedCollection = mongoClient.db(dbName).collection("chunked_documents")
   const queryGetUser = {email: userEmail}
   let filesToInsert = []
+  let userId
 
   // Check if the uploaded file has a same filename as previously uploaded ones
   try {
-    let userDocuments = await usersCollection.findOne(queryGetUser, {projection: {documents:1, _id:0}})
+    let userDocuments = await usersCollection.findOne(queryGetUser, {projection: {documents:1}})
+    userId = userDocuments._id
     userDocuments = userDocuments.documents    
     for (const uploadedFile of files) {
       for (const recordedFile of userDocuments) {
@@ -122,6 +127,35 @@ app.post("/documents", async (req, res) => {
       })
     }
   }    
+
+  // Chunk the documents and get each chunk's embeddings
+  // TODO: Bulk file calls. Right now, we can only upload 1 file at a time
+  try {
+    // Reformat file from a Buffer type -> Blob type. Buffer type is not serialisable whereas Blob is
+    const blobFile = new Blob([files[0].data], { type: 'application/pdf' })
+    let formData = new FormData()
+    formData.append("file", blobFile, files[0].name)
+    const response = await fetch("http://rag:8000/upload", {
+      method: "POST",
+      body: formData
+    })
+
+    chunk_and_embeddings = await response.json()
+  } catch(err) {
+    return res.status(500).send("Something went wrong while trying to get the file chunked and get its embeddings")
+  }
+  // Build the insert query for later on. 
+  const mongoChunkedDocumentsToInsert = []
+  for (let i = 0; i < chunk_and_embeddings.text.length; i++) {
+    // Each chunk will be its own MongoDB document. Common denominator to identify a file will be through its filename and userId
+    mongoChunkedDocumentsToInsert.push({
+      userId: userId,
+      filename: files[0].name,
+      chunk_num: i,
+      text: chunk_and_embeddings.text[i],
+      embeddings: chunk_and_embeddings.embeddings[i]
+    })  
+  }
 
   // Loop through each file to upload to storage and record in database
   for (const file of files) {
@@ -164,22 +198,35 @@ app.post("/documents", async (req, res) => {
     })
   }
 
-  // Update query to MongoDB
+  // Update query for what documents a user has. This query adds the newly added documents to the user's document list
   const queryAddFiles = {
     $push: {
       documents: {$each: filesToInsert}
     }
   }
-  // Add newly added documents to the user's document in the database
+  // Start session for an ACID transaction
+  const mongoSession = mongoClient.startSession()
   try {
-    await usersCollection.updateOne(queryGetUser, queryAddFiles)
+    // Start ACID transaction
+    mongoSession.startTransaction()
+    // Add newly added documents to the user's document in the database
+    await usersCollection.updateOne(queryGetUser, queryAddFiles, { mongoSession })
+    // Add chunked texts and its embeddings to the chunked_documents collection
+    await chunkedCollection.insertMany(mongoChunkedDocumentsToInsert, { mongoSession })
+    // Commit ACID transaction
+    mongoSession.commitTransaction()
   }
   catch (err) {
-    res.status(500).send("Something went wrong while adding document to database. Error message: ", err)
+    // Abort ACID transaction if an error occurs
+    mongoSession.abortTransaction()
+    return res.status(500).send("Something went wrong while adding document to database. Error message: ", err)
+  } finally {
+    mongoSession.endSession()
   }
 
   return res.send("Documents uploaded successfully")
 })
+
 
 app.post("/delete_document", async (req, res) => {
   const { email, filename } = req.body
@@ -229,6 +276,7 @@ app.post("/delete_document", async (req, res) => {
 
   return res.status(200).send("Document successfully deleted")
 })
+
 
 // Signup endpoint
 app.post('/signup', async (req, res) => {

@@ -6,6 +6,7 @@ import fileUpload from "express-fileupload"
 import dotenv from "dotenv"
 import ragRoutes from './ragRoutes.js';
 import { Blob } from "buffer"
+import cookieParser from 'cookie-parser';
 import {
   S3Client,
   HeadBucketCommand,
@@ -26,9 +27,13 @@ const s3client = new S3Client({
 })
 const S3_BUCKET_NAME = "ragtivity"
 
-app.use(cors());
+app.use(cors({ 
+  origin: "http://localhost:5173",
+  credentials: true 
+}));
 app.use(fileUpload()); 
 app.use(express.json()); 
+app.use(cookieParser());
 app.use('/rag', ragRoutes);
 
 async function connect_mongo() {
@@ -350,6 +355,8 @@ app.post('/login', async (req, res) => {
     return res.status(400).json({ message: 'Email and password are required.' });
   }
 
+  let userId
+
    // Get users collection
   const usersCollection = mongoClient.db(dbName).collection("users")
 
@@ -362,6 +369,7 @@ app.post('/login', async (req, res) => {
     if (userDetails == null) {
       return res.status(401).json({message: "User doesn't exist"})
     }
+    userId = userDetails._id
   }
   catch (err) {
     return res.status(500).json({message: "Something went wrong while querying if user's details. Error message: " + err})
@@ -373,6 +381,8 @@ app.post('/login', async (req, res) => {
   if (!passwordIsCorrect) {
       return res.status(401).json({ message: 'Invalid credentials.' });
   }
+
+  res.cookie("userId", userId)
 
   return res.json({message: "Login successful"})
 });

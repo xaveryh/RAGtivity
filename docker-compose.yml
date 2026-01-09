@@ -32,7 +32,7 @@ services:
     depends_on:
       - document_loader
     env_file:
-    - .env
+      - .env
 
   document_loader:
     build:

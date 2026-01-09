@@ -3,11 +3,11 @@ import tempfile
 import shutil
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
 
 app = FastAPI(title="Document Loader Service")
-embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-mpnet-base-v2"
+embeddings = HuggingFaceEndpointEmbeddings(
+    repo_id="sentence-transformers/all-mpnet-base-v2"
 )
 
 

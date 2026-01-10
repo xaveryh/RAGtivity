@@ -1,8 +1,9 @@
 from langchain.agents import create_agent
 from tools import retrieve_context 
 from config import model
+from main import LangchainRuntimeContext
 
-def create_rag_agent():
+def create_rag_agent(LangchainRuntimeContext: LangchainRuntimeContext):
     tools = [retrieve_context]
 
     system_prompt = (
@@ -14,4 +15,5 @@ def create_rag_agent():
         model=model,
         tools=tools,
         system_prompt=system_prompt,
+        context_schema=LangchainRuntimeContext
     )

@@ -31,6 +31,8 @@ services:
       - ./RAG/uploaded_docs:/uploaded_docs
     depends_on:
       - document_loader
+    env_file:
+      - .env
 
   document_loader:
     build:

@@ -1,14 +1,48 @@
-from langchain.tools import tool
-from database import vector_store
+from langchain.tools import tool, ToolRuntime
+from dataclasses import dataclass
+from pymongo import MongoClient
+from config import embeddings
+
+@dataclass
+class LangchainRuntimeContext:
+    mongoClient: MongoClient
+    userId: str
 
 @tool(response_format="content_and_artifact")
-def retrieve_context(query: str):
+def retrieve_context(query: str, runtime: ToolRuntime[LangchainRuntimeContext]):
     """Retrieve information to help answer a query."""
-    retrieved_docs = vector_store.similarity_search(query, k=2)
+    # Get query's embeddings
+    query_embeddings = embeddings.embed_documents([query])
+    # Vector search criteria for MongoDB
+    vectorSearchCriteria = {
+        "$vectorSearch": {
+            "index": "vectorChunkIndex",
+            "path": "embeddings",
+            "queryVector": query_embeddings[0], # [0] to remove extra dimension
+            "numCandidates": 100, # MongoDB recommends this value to be `limit * 20`
+            "limit": 5,
+            # Only search chunks that corresponds to the user
+            "$filter": {
+                "userId": {
+                    "$eq": runtime.context.userId
+                }
+            }
+        }
+    }
+
+    # Get the Mongo client from runtime context
+    mongoClient = runtime.context.mongoClient
+    # Get the vector search retrieval results 
+    results = mongoClient["ragtivity"]["chunked_documents"].aggregate([vectorSearchCriteria])
+
+    # For debugging
+    for doc in results:
+        print(doc)
+
 
     serialized = "\n\n".join(
-        f"Source: {doc.metadata}\nContent: {doc.page_content}"
-        for doc in retrieved_docs
+        f"Source: {doc.filename} \nContent: {doc.text}"
+        for doc in results
     )
 
-    return serialized, retrieved_docs
+    return serialized, results

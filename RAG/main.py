@@ -2,12 +2,18 @@ from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from agents import create_rag_agent
-from database import vector_store
+from dataclasses import dataclass
+from pymongo import MongoClient
 import os
 import shutil
 import re
 import ast
 import requests
+
+@dataclass
+class LangchainRuntimeContext:
+    mongoClient: MongoClient
+    userId: str
 
 DOCUMENT_LOADER_URL = "http://document_loader:8001/load/pdf"
 UPLOAD_DIR = "/uploaded_docs"
@@ -23,11 +29,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-agent = create_rag_agent()
+agent = create_rag_agent(LangchainRuntimeContext)
 
 class QueryRequest(BaseModel):
     question: str
+    userId: str
 
+@app.on_event("startup")
+def app_startup():
+    try:
+        app.mongo_client = MongoClient(os.getenv("MONGO_URI"))
+        app.mongo_client.admin.command("ping")
+        print("Connected to MongoDB")
+    except Exception as e:
+        print("Something went wrong while connecting to MongoDB: " + e)
+        raise Exception("Database connection failed")
+
+@app.on_event("shutdown")
+def app_shutdown():
+    app.mongo_client.close()
 
 @app.get("/")
 def root():
@@ -42,6 +62,7 @@ def query_rag(request: QueryRequest):
     for event in agent.stream(
         {"messages": [{"role": "user", "content": request.question}]},
         stream_mode="values",
+        context=LangchainRuntimeContext(mongoClient=app.mongo_client, userId=request.userId)
     ):
         content = event["messages"][-1].content
 

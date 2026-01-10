@@ -24,7 +24,8 @@ export default function Main({loggedInEmail, onAddDocuments}) {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ question: queryText })
+                body: JSON.stringify({ question: queryText }),
+                credentials: "include"
             });
 
             if (!response.ok) {

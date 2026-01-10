@@ -2,14 +2,11 @@ from fastapi import FastAPI, UploadFile
 import tempfile
 import shutil
 from langchain_community.document_loaders import PyPDFLoader
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
 
 app = FastAPI(title="Document Loader Service")
-embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-mpnet-base-v2"
-)
-
+embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
 
 def split_and_get_embeddings(docs_content):
     splitter = RecursiveCharacterTextSplitter(

@@ -5,6 +5,8 @@ import { MongoClient } from 'mongodb';
 import fileUpload from "express-fileupload"
 import dotenv from "dotenv"
 import ragRoutes from './ragRoutes.js';
+import { Blob } from "buffer"
+import cookieParser from 'cookie-parser';
 import {
   S3Client,
   HeadBucketCommand,
@@ -25,9 +27,13 @@ const s3client = new S3Client({
 })
 const S3_BUCKET_NAME = "ragtivity"
 
-app.use(cors());
+app.use(cors({ 
+  origin: "http://localhost:5173",
+  credentials: true 
+}));
 app.use(fileUpload()); 
 app.use(express.json()); 
+app.use(cookieParser());
 app.use('/rag', ragRoutes);
 
 async function connect_mongo() {
@@ -89,23 +95,27 @@ app.post("/documents", async (req, res) => {
   const userEmail = req.body.email
   let files = req.files.files
   
+  let chunk_and_embeddings
   let uploadFileInput
   let uploadFileCommand
   let uploadFileResponse
-
+  
   // Check if it is a single file or an array of files
   if (Array.isArray(files) == false) {
     files = [files]
   }
-
+  
   // Get user collection
   const usersCollection = mongoClient.db(dbName).collection("users")
+  const chunkedCollection = mongoClient.db(dbName).collection("chunked_documents")
   const queryGetUser = {email: userEmail}
   let filesToInsert = []
+  let userId
 
   // Check if the uploaded file has a same filename as previously uploaded ones
   try {
-    let userDocuments = await usersCollection.findOne(queryGetUser, {projection: {documents:1, _id:0}})
+    let userDocuments = await usersCollection.findOne(queryGetUser, {projection: {documents:1}})
+    userId = userDocuments._id
     userDocuments = userDocuments.documents    
     for (const uploadedFile of files) {
       for (const recordedFile of userDocuments) {
@@ -122,6 +132,36 @@ app.post("/documents", async (req, res) => {
       })
     }
   }    
+
+  // Chunk the documents and get each chunk's embeddings
+  // TODO: Bulk file calls. Right now, we can only upload 1 file at a time
+  try {
+    // Reformat file from a Buffer type -> Blob type. Buffer type is not serialisable whereas Blob is
+    const blobFile = new Blob([files[0].data], { type: 'application/pdf' })
+    let formData = new FormData()
+    formData.append("file", blobFile, files[0].name)
+    const response = await fetch("http://rag:8000/upload", {
+      method: "POST",
+      body: formData
+    })
+
+    chunk_and_embeddings = await response.json()
+  } catch(err) {
+    console.error(err)
+    return res.status(500).send("Something went wrong while trying to get the file chunked and get its embeddings")
+  }
+  // Build the insert query for later on. 
+  const mongoChunkedDocumentsToInsert = []
+  for (let i = 0; i < chunk_and_embeddings.text.length; i++) {
+    // Each chunk will be its own MongoDB document. Common denominator to identify a file will be through its filename and userId
+    mongoChunkedDocumentsToInsert.push({
+      userId: userId,
+      filename: files[0].name,
+      chunk_num: i,
+      text: chunk_and_embeddings.text[i],
+      embeddings: chunk_and_embeddings.embeddings[i]
+    })  
+  }
 
   // Loop through each file to upload to storage and record in database
   for (const file of files) {
@@ -164,28 +204,44 @@ app.post("/documents", async (req, res) => {
     })
   }
 
-  // Update query to MongoDB
+  // Update query for what documents a user has. This query adds the newly added documents to the user's document list
   const queryAddFiles = {
     $push: {
       documents: {$each: filesToInsert}
     }
   }
-  // Add newly added documents to the user's document in the database
+  // Start session for an ACID transaction
+  const mongoSession = mongoClient.startSession()
   try {
-    await usersCollection.updateOne(queryGetUser, queryAddFiles)
+    // Start ACID transaction
+    mongoSession.startTransaction()
+    // Add newly added documents to the user's document in the database
+    await usersCollection.updateOne(queryGetUser, queryAddFiles, { mongoSession })
+    // Add chunked texts and its embeddings to the chunked_documents collection
+    await chunkedCollection.insertMany(mongoChunkedDocumentsToInsert, { mongoSession })
+    // Commit ACID transaction
+    mongoSession.commitTransaction()
   }
   catch (err) {
-    res.status(500).send("Something went wrong while adding document to database. Error message: ", err)
+    // Abort ACID transaction if an error occurs
+    mongoSession.abortTransaction()
+    return res.status(500).send("Something went wrong while adding document to database. Error message: ", err)
+  } finally {
+    mongoSession.endSession()
   }
 
   return res.send("Documents uploaded successfully")
 })
 
+
 app.post("/delete_document", async (req, res) => {
   const { email, filename } = req.body
 
   const usersCollection = mongoClient.db(dbName).collection("users")
+  const chunkedCollection = mongoClient.db(dbName).collection("chunked_documents")
   
+  let userId
+
   // Build queries for MongoDB
   const queryIdentifyUser = {email: email}
   const queryDeleteFile = {$pull: {documents: {filename: filename}}}
@@ -196,17 +252,18 @@ app.post("/delete_document", async (req, res) => {
       }
     }
   }
-
+  
   // Get the target document's storage path
   let documentStoragePath
   try {
     documentStoragePath = await usersCollection.findOne(queryIdentifyUser, queryDocumentStoragePath)
+    userId = documentStoragePath._id
     documentStoragePath = documentStoragePath.documents[0].uploadedFilename
   } 
   catch (err) {
     return res.status(500).send("Something went wrong while querying if document exists or not. Error message: " + err)
   }
-
+  
   // Delete the object from S3 bucket
   const deleteObjectInput = {
     Bucket: S3_BUCKET_NAME,
@@ -219,16 +276,32 @@ app.post("/delete_document", async (req, res) => {
     return res.status(500).send("Something went wrong while deleting object from S3 bucket")
   }
   
+  // Build query to delete chunked documents from MongoDB chunked_documents collection
+  const queryDeleteChunkedDocuments = {
+    userId: userId,
+    filename: filename
+  }
+  // Delete file record from MongoDB
+  const mongoSession = mongoClient.startSession()
   try {
-    await usersCollection.updateOne(queryIdentifyUser, queryDeleteFile)
-
+    // Start ACID transaction
+    mongoSession.startTransaction()
+    // Delete the filename from the user's file list
+    await usersCollection.updateOne(queryIdentifyUser, queryDeleteFile, { mongoSession })
+    await chunkedCollection.deleteMany(queryDeleteChunkedDocuments, { mongoSession })
+    // Commit ACID transaction
+    mongoSession.commitTransaction()
   }
   catch (err) {
-    return res.status(500).send("Something went wrong while deleting document. Error message: " + err)
+    mongoSession.abortTransaction()
+    return res.status(500).send("Something went wrong while deleting file records from MongoDB. Error message: " + err)
+  } finally {
+    mongoSession.endSession()
   }
 
   return res.status(200).send("Document successfully deleted")
 })
+
 
 // Signup endpoint
 app.post('/signup', async (req, res) => {
@@ -283,6 +356,8 @@ app.post('/login', async (req, res) => {
     return res.status(400).json({ message: 'Email and password are required.' });
   }
 
+  let userId
+
    // Get users collection
   const usersCollection = mongoClient.db(dbName).collection("users")
 
@@ -295,6 +370,7 @@ app.post('/login', async (req, res) => {
     if (userDetails == null) {
       return res.status(401).json({message: "User doesn't exist"})
     }
+    userId = userDetails._id
   }
   catch (err) {
     return res.status(500).json({message: "Something went wrong while querying if user's details. Error message: " + err})
@@ -306,6 +382,8 @@ app.post('/login', async (req, res) => {
   if (!passwordIsCorrect) {
       return res.status(401).json({ message: 'Invalid credentials.' });
   }
+
+  res.cookie("userId", userId)
 
   return res.json({message: "Login successful"})
 });
@@ -326,6 +404,42 @@ app.get('/users', async (req, res) => {
 });
 
 
+async function createMongoDBSearchIndex() {
+    const existingIndexes = await mongoClient.db(dbName).collection("chunked_documents").listSearchIndexes().toArray()
+    const indexExists = existingIndexes.some(index => index.name == "vectorChunkIndex")
+
+    if (indexExists){
+        console.log("Index has already been created")
+        return
+    }
+
+    await mongoClient.db("ragtivity").collection("chunked_documents").createSearchIndex({
+        name: "vectorChunkIndex",
+        type: "vectorSearch",
+        definition: {
+            fields: [{
+                type: "vector",
+                numDimensions: 768,
+                path: "embeddings",
+                similarity: "cosine"
+            },
+            {
+                type: "filter",
+                path: "userId"
+            },
+            {
+              type: "filter",
+              path: "filename"
+            }
+        ]
+        }
+    })
+
+    console.log("Vector search index created successfully")
+}
+
+
+
 async function main() {
   try {
     await connect_mongo()
@@ -339,4 +453,5 @@ async function main() {
   }) 
 }
 
+createMongoDBSearchIndex()
 main()

@@ -1,7 +1,9 @@
 from langchain.tools import tool, ToolRuntime
 from dataclasses import dataclass
 from pymongo import MongoClient
-from config import embeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
+embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", output_dimensionality=768)
 
 @dataclass
 class LangchainRuntimeContext:
@@ -35,13 +37,8 @@ def retrieve_context(query: str, runtime: ToolRuntime[LangchainRuntimeContext]):
     # Get the vector search retrieval results 
     results = mongoClient["ragtivity"]["chunked_documents"].aggregate([vectorSearchCriteria])
 
-    # For debugging
-    for doc in results:
-        print(doc)
-
-
     serialized = "\n\n".join(
-        f"Source: {doc.filename} \nContent: {doc.text}"
+        f"Source: {doc["filename"]} \nContent: {doc["text"]}"
         for doc in results
     )
 

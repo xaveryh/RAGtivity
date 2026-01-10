@@ -11,6 +11,7 @@ RUN pip install --no-cache-dir \
     pypdf \
     langchain-text-splitters \
     langchain-google-genai \
+    langchain-community \
     python-dotenv
 
 CMD ["uvicorn", "document_loader:app", "--host", "0.0.0.0", "--port", "8001"]

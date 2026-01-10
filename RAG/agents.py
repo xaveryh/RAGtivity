@@ -1,7 +1,13 @@
 from langchain.agents import create_agent
 from tools import retrieve_context 
 from config import model
-from main import LangchainRuntimeContext
+from dataclasses import dataclass
+from pymongo import MongoClient
+
+@dataclass
+class LangchainRuntimeContext:
+    mongoClient: MongoClient
+    userId: str
 
 def create_rag_agent(LangchainRuntimeContext: LangchainRuntimeContext):
     tools = [retrieve_context]

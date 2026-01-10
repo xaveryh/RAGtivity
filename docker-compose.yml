@@ -40,6 +40,8 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./RAG/uploaded_docs:/uploaded_docs
+    env_file:
+      - .env
 
 volumes:
   node_modules:
